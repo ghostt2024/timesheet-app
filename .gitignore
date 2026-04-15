@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Database & data
+*.db
+*.sqlite
+*.sqlite3
+TimesheetData/
+timesheet.db
+
+# Environment secrets
+.env
+*.env
+config.json
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build output
+dist/
+build/
