@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Worker Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+      background: #1f2937;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+    
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .dashboard-grid { grid-template-columns: 1fr; }
+      body { padding: 1rem; }
+    }
+    
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #111827;
+      padding: 1rem 1.5rem;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      margin-bottom: 0.5rem;
+    }
+    
+    .user-info { display: flex; align-items: center; gap: 1rem; }
+    .user-avatar {
+      width: 45px; height: 45px;
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 1.2rem; font-weight: bold;
+    }
+    .user-text h2 { font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.2rem; letter-spacing: 0.5px; }
+    .user-text .name { font-size: 1.2rem; font-weight: 700; color: #f9fafb; }
+    
+    .logout-btn {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white; border: none;
+      padding: 0.6rem 1.3rem; border-radius: 10px;
+      cursor: pointer; font-weight: 600; font-size: 0.85rem;
+      display: flex; align-items: center; gap: 0.5rem;
+      transition: all 0.3s;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+      width: 40%; max-width: 160px;
+      justify-content: center;
+    }
+    .logout-btn:hover { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+    }
+
+    .left-panel { display: flex; flex-direction: column; gap: 1rem; }
+    
+    .timer-card {
+      background: #111827;
+      border-radius: 20px;
+      padding: 2rem 1.5rem;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      text-align: center;
+      min-height: 300px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid #374151;
+    }
+    
+    .timer-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+    }
+    
+    .status-container {
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 1rem;
+      border-radius: 50px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: all 0.3s;
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.9); }
+    }
+    
+    .status-inactive { background: #374151; color: #9ca3af; }
+    .status-active { 
+      background: rgba(34, 197, 94, 0.2); 
+      color: #22c55e;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .status-paused { 
+      background: rgba(245, 158, 11, 0.2); 
+      color: #f59e0b;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    
+    .timer-container {
+      min-height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0.5rem 0;
+    }
+    
+    .live-timer {
+      font-size: 4rem;
+      font-weight: 800;
+      font-family: 'Courier New', monospace;
+      color: #f9fafb;
+      letter-spacing: -2px;
+      line-height: 1;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    
+    .stats-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.8rem;
+    }
+    
+    .stat-box {
+      background: #1f2937;
+      padding: 1rem;
+      border-radius: 12px;
+      border: 1px solid #374151;
+      transition: all 0.3s;
+    }
+    
+    .stat-box:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      border-color: #4b5563;
+    }
+    
+    .stat-box label {
+      display: block;
+      font-size: 0.75rem;
+      color: #9ca3af;
+      margin-bottom: 0.3rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .stat-box .value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+      color: #f9fafb;
+    }
+    
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+    }
+    
+    .btn {
+      padding: 0.9rem;
+      border: none;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.3s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { 
+      opacity: 0.4; 
+      cursor: not-allowed; 
+      transform: none !important;
+      box-shadow: none;
+    }
+    
+    .btn-start { 
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); 
+      color: white; 
+      grid-column: 1 / -1;
+      font-size: 1rem;
+    }
+    .btn-start:hover:not(:disabled) { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
+    }
+    
+    .btn-pause { 
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
+      color: white;
+    }
+    .btn-pause:hover:not(:disabled) { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+    }
+    
+    .btn-resume { 
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+      color: white;
+    }
+    .btn-resume:hover:not(:disabled) { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+    
+    .btn-end { 
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); 
+      color: white; 
+      grid-column: 1 / -1;
+    }
+    .btn-end:hover:not(:disabled) { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+    }
+
+    .right-panel {
+      background: #111827;
+      border-radius: 20px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      height: calc(100vh - 220px);
+      display: flex;
+      flex-direction: column;
+      position: sticky;
+      top: 1.5rem;
+      border: 1px solid #374151;
+    }
+    
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 2px solid #374151;
+      position: relative;
+    }
+    
+    .panel-header h3 {
+      font-size: 1rem;
+      color: #f9fafb;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    /* ✅ CALENDAR PICKER STYLES */
+    .calendar-picker {
+      position: relative;
+    }
+    
+    .calendar-trigger {
+      background: #1f2937;
+      border: 1px solid #374151;
+      color: #f9fafb;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s;
+    }
+    
+    .calendar-trigger:hover {
+      background: #374151;
+      border-color: #4b5563;
+    }
+    
+    .calendar-popup {
+      position: absolute;
+      top: calc(100% + 0.5rem);
+      right: 0;
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 1rem;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      z-index: 100;
+      display: none;
+      min-width: 280px;
+    }
+    
+    .calendar-popup.show {
+      display: block;
+    }
+    
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #374151;
+    }
+    
+    .calendar-header h4 {
+      color: #f9fafb;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    
+    .calendar-nav-btn {
+      background: #374151;
+      border: none;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #9ca3af;
+      font-weight: bold;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .calendar-nav-btn:hover {
+      background: #3b82f6;
+      color: white;
+    }
+    
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 0.3rem;
+    }
+    
+    .calendar-day-header {
+      text-align: center;
+      font-size: 0.7rem;
+      color: #9ca3af;
+      font-weight: 600;
+      padding: 0.4rem 0;
+      text-transform: uppercase;
+    }
+    
+    .calendar-day {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #f9fafb;
+      transition: all 0.2s;
+    }
+    
+    .calendar-day:hover {
+      background: #374151;
+      border-color: #4b5563;
+      transform: scale(1.1);
+    }
+    
+    .calendar-day.today {
+      background: #3b82f6;
+      border-color: #3b82f6;
+      color: white;
+      font-weight: 700;
+    }
+    
+    .calendar-day.selected {
+      background: #22c55e;
+      border-color: #22c55e;
+      color: white;
+      font-weight: 700;
+    }
+    
+    .calendar-day.empty {
+      background: transparent;
+      border: none;
+      cursor: default;
+    }
+    
+    .calendar-day.empty:hover {
+      transform: none;
+    }
+    
+    .selected-date-display {
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      color: #9ca3af;
+      text-align: center;
+    }
+
+    .history-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+    
+    .history-item {
+      padding: 0.9rem;
+      background: #1f2937;
+      border-radius: 12px;
+      margin-bottom: 0.7rem;
+      border-left: 4px solid #3b82f6;
+      border: 1px solid #374151;
+    }
+    
+    .history-item.today {
+      border-left-color: #22c55e;
+      background: rgba(34, 197, 94, 0.1);
+    }
+    
+    .history-top {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.4rem;
+    }
+    
+    .history-day {
+      font-weight: 700;
+      color: #f9fafb;
+      font-size: 0.9rem;
+    }
+    
+    .history-badge {
+      font-size: 0.65rem;
+      background: #22c55e;
+      color: white;
+      padding: 0.15rem 0.4rem;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    
+    .history-time {
+      font-size: 0.8rem;
+      color: #9ca3af;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    
+    .history-bottom {
+      display: flex;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    
+    .h-stat {
+      background: #111827;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      border: 1px solid #374151;
+    }
+    
+    .h-stat.work { color: #22c55e; }
+    .h-stat.pause { color: #f59e0b; }
+    
+    .no-data {
+      text-align: center;
+      color: #6b7280;
+      padding: 2rem 1rem;
+      font-style: italic;
+    }
+    
+    /* ✅ MONTHLY SUMMARY BUTTON */
+    .monthly-summary-btn {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      transition: all 0.3s;
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    }
+    
+    .monthly-summary-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+    }
+    
+    /* ✅ MONTHLY SUMMARY MODAL */
+    .monthly-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    
+    .monthly-modal.show {
+      display: flex;
+    }
+    
+    .monthly-modal-content {
+      background: #111827;
+      border-radius: 20px;
+      padding: 2rem;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      border: 1px solid #374151;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      animation: modalSlideIn 0.3s ease;
+    }
+    
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    
+    .monthly-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid #374151;
+    }
+    
+    .monthly-modal-header h3 {
+      color: #f9fafb;
+      font-size: 1.3rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    
+    .monthly-modal-header h3 i {
+      color: #a78bfa;
+    }
+    
+    .close-modal-btn {
+      background: #374151;
+      border: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      color: #f9fafb;
+      cursor: pointer;
+      font-size: 1.2rem;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .close-modal-btn:hover {
+      background: #4b5563;
+      transform: rotate(90deg);
+    }
+    
+    .monthly-selector {
+      display: flex;
+      gap: 0.8rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    
+    .monthly-selector select {
+      flex: 1;
+      min-width: 120px;
+      background: #1f2937;
+      color: #f9fafb;
+      border: 1px solid #374151;
+      padding: 0.7rem 1rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      outline: none;
+    }
+    
+    .monthly-selector select:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+    
+    .monthly-selector button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 0.7rem 1.2rem;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    
+    .monthly-selector button:hover {
+      background: #2563eb;
+      transform: translateY(-2px);
+    }
+    
+    .monthly-card {
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      border-radius: 16px;
+      padding: 1.5rem;
+      color: white;
+      margin-bottom: 1.2rem;
+      text-align: center;
+    }
+    
+    .monthly-card h4 {
+      font-size: 0.95rem;
+      opacity: 0.95;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    
+    .monthly-card .value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    
+    .monthly-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    
+    .monthly-stat {
+      background: #1f2937;
+      padding: 1.2rem;
+      border-radius: 12px;
+      text-align: center;
+      border: 1px solid #374151;
+      transition: all 0.2s;
+    }
+    
+    .monthly-stat:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    
+    .monthly-stat .label {
+      font-size: 0.85rem;
+      color: #9ca3af;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+    }
+    
+    .monthly-stat .value {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #f9fafb;
+    }
+    
+    .monthly-stat.work .value { color: #22c55e; }
+    .monthly-stat.pause .value { color: #f59e0b; }
+    .monthly-stat.sessions .value { color: #3b82f6; }
+    
+    .monthly-footer {
+      margin-top: 1.2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #374151;
+      font-size: 0.9rem;
+      color: #9ca3af;
+      text-align: center;
+    }
+    
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1f2937; }
+    ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+  </style>
+</head>
+<body>
+
+  <div class="dashboard-grid">
+    
+    <!-- HEADER -->
+    <div class="header">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">👤</div>
+        <div class="user-text">
+          <h2>Worker Name</h2>
+          <div class="name" id="userName">Loading...</div>
+        </div>
+      </div>
+      <button class="logout-btn" onclick="logout()">
+        <i class="fas fa-sign-out-alt"></i> Logout
+      </button>
+    </div>
+    
+    <!-- LEFT PANEL -->
+    <div class="left-panel">
+      <div class="timer-card">
+        <div>
+          <div class="status-container">
+            <span id="statusBadge" class="status-badge status-inactive">
+              <span class="status-dot"></span> Inactive
+            </span>
+          </div>
+          
+          <div class="timer-container">
+            <div class="live-timer" id="liveTimer">00:00:00</div>
+          </div>
+        </div>
+        
+        <div class="stats-row">
+          <div class="stat-box">
+            <label><i class="fas fa-stopwatch"></i> Work Time</label>
+            <div class="value" id="workTime">00:00:00</div>
+          </div>
+          <div class="stat-box">
+            <label><i class="fas fa-mug-hot"></i> Pause Time</label>
+            <div class="value" id="pauseTime">00:00:00</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="controls">
+        <button id="btnStart" class="btn btn-start" onclick="startJob()">
+          <i class="fas fa-play"></i> Start Job
+        </button>
+        <button id="btnPause" class="btn btn-pause" onclick="pauseJob()" disabled>
+          <i class="fas fa-pause"></i> Pause
+        </button>
+        <button id="btnResume" class="btn btn-resume" onclick="resumeJob()" disabled>
+          <i class="fas fa-play"></i> Resume
+        </button>
+        <button id="btnEnd" class="btn btn-end" onclick="endJob()" disabled>
+          <i class="fas fa-stop"></i> End Job
+        </button>
+      </div>
+    </div>
+    
+    <!-- RIGHT PANEL -->
+    <div class="right-panel">
+      <div class="panel-header">
+        <h3><i class="fas fa-history" style="color:#3b82f6"></i> Work History</h3>
+        
+        <!-- ✅ CALENDAR PICKER -->
+        <div class="calendar-picker">
+          <button class="calendar-trigger" onclick="toggleCalendar()">
+            <i class="fas fa-calendar-alt"></i>
+            <span id="selectedDateDisplay">Select Date</span>
+          </button>
+          
+          <div class="calendar-popup" id="calendarPopup">
+            <div class="calendar-header">
+              <button class="calendar-nav-btn" onclick="changeCalendarMonth(-1)">◀</button>
+              <h4 id="calendarMonthYear">Loading...</h4>
+              <button class="calendar-nav-btn" onclick="changeCalendarMonth(1)">▶</button>
+            </div>
+            <div class="calendar-grid" id="calendarGrid">
+              <!-- Calendar will be generated here -->
+            </div>
+            <div class="selected-date-display" id="selectedDateInfo"></div>
+          </div>
+        </div>
+        
+      </div>
+      
+      <div class="history-scroll" id="historyList">
+        <div class="no-data">Loading history...</div>
+      </div>
+      
+      <!-- ✅ MONTHLY SUMMARY BUTTON -->
+      <button class="monthly-summary-btn" onclick="openMonthlyModal()">
+        <i class="fas fa-chart-pie"></i> My Monthly Summary
+      </button>
+      
+    </div>
+    
+  </div>
+
+  <!-- ✅ MONTHLY SUMMARY MODAL -->
+  <div class="monthly-modal" id="monthlyModal">
+    <div class="monthly-modal-content">
+      <div class="monthly-modal-header">
+        <h3><i class="fas fa-chart-pie"></i> My Monthly Summary</h3>
+        <button class="close-modal-btn" onclick="closeMonthlyModal()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="monthly-selector">
+        <select id="modalSummaryMonth">
+          <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+          <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+          <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+        </select>
+        <select id="modalSummaryYear"></select>
+        <button onclick="loadModalMonthlyData()">🔄 Refresh</button>
+      </div>
+      
+      <div id="modalMonthlyContainer">
+        <div class="loading" style="padding:2rem; text-align:center; color:#9ca3af;">
+          <i class="fas fa-spinner fa-spin" style="font-size:2rem; margin-bottom:1rem;"></i>
+          <div>Loading monthly data...</div>
+        </div>
+      </div>
+      
+      <div class="monthly-footer" id="modalFooter">
+        Select a month to view your work summary
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const token = sessionStorage.getItem('token');
+    const userName = sessionStorage.getItem('name');
+    if (!token) window.location.href = '/';
+    
+    document.getElementById('userName').textContent = userName || 'Worker';
+    document.getElementById('userAvatar').textContent = userName ? userName.charAt(0).toUpperCase() : '👤';
+
+    let currentSession = null, timerInterval = null, startTime = null, totalPauseSeconds = 0, pauseStartTime = null;
+    let currentDate = new Date(), sessionHistory = [];
+    let calendarDate = new Date();
+    let selectedDate = null;
+
+    function formatTime(s) {
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    }
+
+    function getLocalDate(ts) {
+      if (!ts) return '';
+      const d = new Date(ts);
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function formatDayLabel(ts) {
+      if (!ts) return '';
+      return new Date(ts).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+    }
+
+    function formatFullDate(dateStr) {
+      if (!dateStr) return 'Select Date';
+      const d = new Date(dateStr);
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
+      const monthName = d.toLocaleDateString('en-US', { month: 'long' });
+      const day = d.getDate();
+      const year = d.getFullYear();
+      return `${dayName}, ${day} ${monthName} ${year}`;
+    }
+
+    function updateButtonStates() {
+      const btnStart = document.getElementById('btnStart');
+      const btnPause = document.getElementById('btnPause');
+      const btnResume = document.getElementById('btnResume');
+      const btnEnd = document.getElementById('btnEnd');
+      const badge = document.getElementById('statusBadge');
+
+      if (!currentSession) {
+        btnStart.disabled = false; btnPause.disabled = true; btnResume.disabled = true; btnEnd.disabled = true;
+        badge.innerHTML = '<span class="status-dot"></span> Inactive';
+        badge.className = 'status-badge status-inactive';
+      } else if (currentSession.status === 'active') {
+        btnStart.disabled = true; btnPause.disabled = false; btnResume.disabled = true; btnEnd.disabled = false;
+        badge.innerHTML = '<span class="status-dot"></span> Working';
+        badge.className = 'status-badge status-active';
+      } else {
+        btnStart.disabled = true; btnPause.disabled = true; btnResume.disabled = false; btnEnd.disabled = false;
+        badge.innerHTML = '<span class="status-dot"></span> Paused';
+        badge.className = 'status-badge status-paused';
+      }
+    }
+
+    function updateTimer() {
+      if (!currentSession || !startTime) { document.getElementById('liveTimer').textContent = '00:00:00'; return; }
+      const now = Date.now();
+      let elapsed = Math.floor((now - startTime) / 1000);
+      if (currentSession.status === 'paused' && pauseStartTime) elapsed -= Math.floor((now - pauseStartTime) / 1000);
+      const work = Math.max(0, elapsed - totalPauseSeconds);
+      const pause = totalPauseSeconds + (currentSession.status === 'paused' && pauseStartTime ? Math.floor((now - pauseStartTime) / 1000) : 0);
+      document.getElementById('liveTimer').textContent = formatTime(work);
+      document.getElementById('workTime').textContent = formatTime(work);
+      document.getElementById('pauseTime').textContent = formatTime(pause);
+    }
+
+    function startTimer() { if (timerInterval) clearInterval(timerInterval); updateTimer(); timerInterval = setInterval(updateTimer, 1000); }
+    function stopTimer() { if (timerInterval) { clearInterval(timerInterval); timerInterval = null; } }
+
+    async function fetchCurrentSession() {
+      try {
+        const res = await fetch('/api/time/current', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) throw new Error('Failed');
+        const session = await res.json();
+        if (session) {
+          currentSession = session; startTime = session.start_time;
+          totalPauseSeconds = session.total_pause_seconds || 0; pauseStartTime = session.pause_start_time || null;
+          if (session.status !== 'completed') startTimer();
+        } else { currentSession = null; startTime = null; totalPauseSeconds = 0; pauseStartTime = null; stopTimer(); }
+        updateButtonStates(); updateTimer();
+      } catch (e) { console.error(e); }
+    }
+
+    async function apiCall(endpoint) {
+      const res = await fetch(`/api/time/${endpoint}`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
+      const data = await res.json();
+      if (!res.ok) return alert('❌ ' + data.error);
+      
+      if (endpoint === 'start') {
+        currentSession = data; startTime = data.start_time; totalPauseSeconds = 0; pauseStartTime = null; startTimer();
+      } else if (endpoint === 'pause') { currentSession.status = 'paused'; pauseStartTime = Date.now(); }
+      else if (endpoint === 'resume') {
+        currentSession.status = 'active'; if (pauseStartTime) totalPauseSeconds += Math.floor((Date.now() - pauseStartTime) / 1000); pauseStartTime = null;
+      } else if (endpoint === 'end') {
+        alert(`✅ Job Completed!\n⏱️ Work: ${formatTime(data.work_time_seconds)}\n☕ Pause: ${formatTime(data.pause_time_seconds)}`);
+        currentSession = null; startTime = null; totalPauseSeconds = 0; pauseStartTime = null; stopTimer();
+        loadHistory();
+      }
+      updateButtonStates(); updateTimer();
+    }
+
+    function startJob() { apiCall('start'); }
+    function pauseJob() { apiCall('pause'); }
+    function resumeJob() { apiCall('resume'); }
+    function endJob() { if(currentSession && confirm('⚠️ End this job?')) apiCall('end'); }
+
+    // ✅ CALENDAR FUNCTIONS
+    function toggleCalendar() {
+      const popup = document.getElementById('calendarPopup');
+      popup.classList.toggle('show');
+      if (popup.classList.contains('show')) {
+        renderCalendar();
+      }
+    }
+
+    function changeCalendarMonth(delta) {
+      calendarDate.setMonth(calendarDate.getMonth() + delta);
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const year = calendarDate.getFullYear();
+      const month = calendarDate.getMonth();
+      const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      
+      document.getElementById('calendarMonthYear').textContent = `${months[month]} ${year}`;
+      
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const today = new Date();
+      const grid = document.getElementById('calendarGrid');
+      
+      grid.innerHTML = '';
+      
+      // Day headers
+      const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      dayHeaders.forEach(day => {
+        const header = document.createElement('div');
+        header.className = 'calendar-day-header';
+        header.textContent = day;
+        grid.appendChild(header);
+      });
+      
+      // Empty cells before first day
+      for (let i = 0; i < firstDay; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'calendar-day empty';
+        grid.appendChild(empty);
+      }
+      
+      // Days
+      for (let day = 1; day <= daysInMonth; day++) {
+        const cell = document.createElement('div');
+        cell.className = 'calendar-day';
+        
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        // Check if today
+        if (today.getDate() === day && today.getMonth() === month && today.getFullYear() === year) {
+          cell.classList.add('today');
+        }
+        
+        // Check if selected
+        if (selectedDate === dateStr) {
+          cell.classList.add('selected');
+        }
+        
+        cell.textContent = day;
+        cell.onclick = () => selectCalendarDate(dateStr);
+        
+        grid.appendChild(cell);
+      }
+    }
+
+    function selectCalendarDate(dateStr) {
+      selectedDate = dateStr;
+      document.getElementById('selectedDateDisplay').textContent = formatFullDate(dateStr).split(',')[0];
+      document.getElementById('selectedDateInfo').textContent = formatFullDate(dateStr);
+      renderCalendar();
+      loadHistoryForDate(dateStr);
+      toggleCalendar();
+    }
+
+    async function loadHistoryForDate(dateStr) {
+      const container = document.getElementById('historyList');
+      
+      const daySessions = sessionHistory.filter(s => getLocalDate(s.start_time) === dateStr);
+      
+      if (daySessions.length === 0) {
+        container.innerHTML = `<div class="no-data"><i class="fas fa-calendar-times" style="font-size:2rem;margin-bottom:0.5rem;display:block;opacity:0.4;"></i>No work on ${formatFullDate(dateStr)}</div>`;
+        return;
+      }
+      
+      daySessions.sort((a, b) => a.start_time - b.start_time);
+      const earliest = daySessions[0];
+      const latest = daySessions[daySessions.length - 1];
+      const totalWork = daySessions.reduce((sum, s) => sum + (s.work_seconds || 0), 0);
+      const totalPause = daySessions.reduce((sum, s) => sum + (s.pause_seconds || 0), 0);
+      
+      const html = `
+        <div class="history-item today">
+          <div class="history-top">
+            <span class="history-day">${formatFullDate(dateStr)}</span>
+          </div>
+          <div class="history-time">
+            <i class="fas fa-clock"></i> ${earliest.start_hour} → ${latest.end_hour || '—'}
+          </div>
+          <div class="history-bottom">
+            <span class="h-stat work">⏱ ${formatTime(totalWork)}</span>
+            <span class="h-stat pause">☕ ${formatTime(totalPause)}</span>
+          </div>
+        </div>
+      `;
+      
+      container.innerHTML = html;
+    }
+
+    async function loadHistory() {
+      const y = currentDate.getFullYear(), m = currentDate.getMonth();
+      const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      
+      try {
+        const res = await fetch(`/api/time/history?month=${m+1}&year=${y}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) throw new Error('Failed');
+        sessionHistory = await res.json();
+        
+        // If a date is selected, show that date's history
+        if (selectedDate) {
+          loadHistoryForDate(selectedDate);
+        } else {
+          renderHistory();
+        }
+      } catch(e) {
+        document.getElementById('historyList').innerHTML = `<div class="no-data">Error loading history</div>`;
+      }
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('historyList');
+      const y = currentDate.getFullYear(), m = currentDate.getMonth();
+      const todayStr = getLocalDate(Date.now());
+      
+      const daysMap = {};
+      for (let d = 1; d <= 31; d++) {
+        const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        let daySessions = sessionHistory.filter(s => getLocalDate(s.start_time) === dateStr);
+        
+        if (daySessions.length) {
+          daySessions.sort((a, b) => a.start_time - b.start_time);
+          const earliest = daySessions[0];
+          const latest = daySessions[daySessions.length - 1];
+          
+          daysMap[dateStr] = {
+            startHour: earliest.start_hour,
+            endHour: latest.end_hour || '—',
+            totalWork: daySessions.reduce((sum, s) => sum + (s.work_seconds || 0), 0),
+            totalPause: daySessions.reduce((sum, s) => sum + (s.pause_seconds || 0), 0),
+            firstTime: earliest.start_time
+          };
+        }
+      }
+      
+      if (Object.keys(daysMap).length === 0) {
+        container.innerHTML = `<div class="no-data"><i class="fas fa-clipboard-list" style="font-size:2rem;margin-bottom:0.5rem;display:block;opacity:0.4;"></i>No work this month</div>`;
+        return;
+      }
+      
+      let html = '';
+      Object.entries(daysMap).sort((a,b) => b[0].localeCompare(a[0])).forEach(([dateStr, data]) => {
+        const isToday = dateStr === todayStr;
+        
+        html += `
+          <div class="history-item ${isToday ? 'today' : ''}">
+            <div class="history-top">
+              <span class="history-day">${formatDayLabel(data.firstTime)}</span>
+              ${isToday ? '<span class="history-badge">Today</span>' : ''}
+            </div>
+            <div class="history-time">
+              <i class="fas fa-clock"></i> ${data.startHour} → ${data.endHour}
+            </div>
+            <div class="history-bottom">
+              <span class="h-stat work">⏱ ${formatTime(data.totalWork)}</span>
+              <span class="h-stat pause">☕ ${formatTime(data.totalPause)}</span>
+            </div>
+          </div>
+        `;
+      });
+      
+      container.innerHTML = html;
+    }
+
+    // ✅ MONTHLY SUMMARY MODAL FUNCTIONS
+    function openMonthlyModal() {
+      const modal = document.getElementById('monthlyModal');
+      modal.classList.add('show');
+      document.body.style.overflow = 'hidden'; // Prevent background scrolling
+      
+      // Initialize year dropdown if not already done
+      const yearSelect = document.getElementById('modalSummaryYear');
+      if (yearSelect.options.length === 0) {
+        const currentYear = new Date().getFullYear();
+        for (let y = currentYear - 2; y <= currentYear + 2; y++) {
+          const opt = document.createElement('option');
+          opt.value = y;
+          opt.textContent = y;
+          if (y === currentYear) opt.selected = true;
+          yearSelect.appendChild(opt);
+        }
+        document.getElementById('modalSummaryMonth').value = new Date().getMonth() + 1;
+      }
+      
+      loadModalMonthlyData();
+    }
+
+    function closeMonthlyModal() {
+      const modal = document.getElementById('monthlyModal');
+      modal.classList.remove('show');
+      document.body.style.overflow = ''; // Restore scrolling
+    }
+
+    async function loadModalMonthlyData() {
+      const month = document.getElementById('modalSummaryMonth').value;
+      const year = document.getElementById('modalSummaryYear').value;
+      const container = document.getElementById('modalMonthlyContainer');
+      const footer = document.getElementById('modalFooter');
+      
+      container.innerHTML = `
+        <div class="loading" style="padding:2rem; text-align:center; color:#9ca3af;">
+          <i class="fas fa-spinner fa-spin" style="font-size:2rem; margin-bottom:1rem;"></i>
+          <div>Loading monthly data...</div>
+        </div>
+      `;
+      
+      try {
+        const res = await fetch(`/api/time/monthly?month=${month}&year=${year}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to load monthly data');
+        
+        const data = await res.json();
+        const monthName = new Date(year, month-1).toLocaleString('default', { month: 'long' });
+        
+        container.innerHTML = `
+          <div class="monthly-card">
+            <h4><i class="fas fa-chart-bar"></i> Total Work Time</h4>
+            <div class="value">${data.work_hours}h</div>
+          </div>
+          <div class="monthly-stats">
+            <div class="monthly-stat work">
+              <div class="label"><i class="fas fa-stopwatch"></i> Work Time</div>
+              <div class="value">${data.work_time}</div>
+            </div>
+            <div class="monthly-stat pause">
+              <div class="label"><i class="fas fa-coffee"></i> Pause Time</div>
+              <div class="value">${data.pause_time}</div>
+            </div>
+            <div class="monthly-stat sessions" style="grid-column: 1 / -1;">
+              <div class="label"><i class="fas fa-clipboard-list"></i> Total Sessions</div>
+              <div class="value">${data.total_sessions}</div>
+            </div>
+          </div>
+        `;
+        
+        footer.textContent = `📅 ${monthName} ${year}`;
+        
+      } catch (error) {
+        console.error('Monthly summary error:', error);
+        container.innerHTML = `
+          <div style="color:#fca5a5; text-align:center; padding:2rem;">
+            <i class="fas fa-exclamation-circle" style="font-size:2rem; margin-bottom:1rem;"></i>
+            <div>Error loading monthly data</div>
+          </div>
+        `;
+        footer.textContent = 'Please try again';
+      }
+    }
+
+    // Close modal when clicking outside
+    document.getElementById('monthlyModal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeMonthlyModal();
+      }
+    });
+
+    // Close calendar when clicking outside
+    document.addEventListener('click', function(event) {
+      const calendarPicker = document.querySelector('.calendar-picker');
+      const popup = document.getElementById('calendarPopup');
+      if (!calendarPicker.contains(event.target)) {
+        popup.classList.remove('show');
+      }
+    });
+
+    function logout() { 
+      sessionStorage.clear();
+      window.location.href = '/'; 
+    }
+    
+    fetchCurrentSession();
+    loadHistory();
+  </script>
+</body>
+</html>
